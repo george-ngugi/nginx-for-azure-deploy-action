@@ -1,0 +1,69 @@
+# File: .github/workflows/testNginxForAzureDeployV1.yml
+
+name: Test Github action to update NGINX for Azure configurations and certificates
+on:
+  - push
+  - workflow_dispatch
+
+env:
+  NGINX_DEPLOYMENT_NAME: github-action-test-deployment
+  NGINX_TRANSFORMED_CONFIG_DIR_PATH: /etc/nginx/
+  NGINX_ROOT_CONFIG_FILE: nginx.conf
+  TEST_RESOURCE_GROUP_NAME: github-action-test-rg
+  NGINX_RESOURCE_LOCATION: westcentralus
+  NGINX_CERTIFICATES: '[{"certificateName": "server4", "keyvaultSecret": "https://isolated-kv.vault.azure.net/secrets/server", "certificateVirtualPath": "/etc/ssl/certs/server4.crt", "keyVirtualPath": "/etc/ssl/certs/server4.key"  }, {"certificateName": "server5", "keyvaultSecret": "https://isolated-kv.vault.azure.net/secrets/acr-auth", "certificateVirtualPath": "/etc/ssl/certs/server5.crt", "keyVirtualPath": "/etc/ssl/certs/server5.key"  }]'
+
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  Update-NGINX-On-Azure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout repository'
+        uses: actions/checkout@v2
+      - name: 'AZ CLI Login'
+        uses: azure/login@v1
+        with:
+            client-id: ${{ secrets.AZURE_CLIENT_ID }}
+            tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+            subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: 'Sync NGINX certs to NGINX on Azure instance'
+        uses: nginxinc/nginx-for-azure-deploy-action@v1
+        with:
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resource-group-name: $TEST_RESOURCE_GROUP_NAME
+          nginx-deployment-name: $NGINX_DEPLOYMENT_NAME
+          nginx-deployment-location: $NGINX_RESOURCE_LOCATION
+          nginx-certificate-details: $NGINX_CERTIFICATES
+      - name: 'Sync NGINX configuration to NGINX on Azure instance - single file'
+        uses: nginxinc/nginx-for-azure-deploy-action@v1
+        with:
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resource-group-name: $TEST_RESOURCE_GROUP_NAME
+          nginx-deployment-name: $NGINX_DEPLOYMENT_NAME
+          nginx-config-directory-path: test/configs/single/
+          nginx-root-config-file: $NGINX_ROOT_CONFIG_FILE
+          transformed-nginx-config-directory-path: $NGINX_TRANSFORMED_CONFIG_DIR_PATH
+      - name: 'Sync NGINX configuration to NGINX on Azure instance - multi file'
+        uses: nginxinc/nginx-for-azure-deploy-action@v1
+        with:
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resource-group-name: $TEST_RESOURCE_GROUP_NAME
+          nginx-deployment-name: $NGINX_DEPLOYMENT_NAME
+          nginx-config-directory-path: test/configs/multi/
+          nginx-root-config-file: $NGINX_ROOT_CONFIG_FILE
+          transformed-nginx-config-directory-path: $NGINX_TRANSFORMED_CONFIG_DIR_PATH
+      - name: 'Sync NGINX certs and config to NGINX on Azure instance'
+        uses: nginxinc/nginx-for-azure-deploy-action@v1
+        with:
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resource-group-name: $TEST_RESOURCE_GROUP_NAME
+          nginx-deployment-name: $NGINX_DEPLOYMENT_NAME
+          nginx-config-directory-path: test/configs/multi/
+          nginx-root-config-file: $NGINX_ROOT_CONFIG_FILE
+          transformed-nginx-config-directory-path: $NGINX_TRANSFORMED_CONFIG_DIR_PATH
+          nginx-deployment-location: $NGINX_RESOURCE_LOCATION
+          nginx-certificate-details: $NGINX_CERTIFICATES
